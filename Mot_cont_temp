@@ -1,0 +1,253 @@
+/*
+******************************************************************************************
+Deep-Pilot Projet 2018.10.10
+Krecht Rudolf - Gulyás Péter
+Autonomous model car : Motordriver control and Encoder reading on serial port
+Serial string to read : command_torque , command_steering
+//Feedback : Time Steer_angle Velocity Rpm Distance_behind
+Torque set: {0;2}
+Steering controll set: {0;2}
+Steer_angle_feedback (-10° ; 10°)
+Velocity in m/s
+PIN MAP Arduino Uno:
+A0 - Servo feedback
+D9 - Servo control
+D6 - L298 H-bridge ENA
+D7 - L298 H-bridge IN1
+D4 - L298 H-bridge IN2
+D2 - Encoder A
+D8 - Encoder B
+******************************************************************************************
+*/
+
+#include <Servo.h>
+Servo myservo;
+
+//PIN Mapping
+#define SrvFb A0  
+#define SrvDrv 9  
+#define ENA 6  
+#define IN1 7  
+#define IN2 4
+//#define ENC_A 2
+//#define ENC_B 8
+
+#define INPUT_SIZE 10
+
+struct MotFb
+{
+  double velo;
+  double dist;
+  int rpm;
+};
+typedef struct MotFb Motor_FB;
+
+//----------------------------------------------------------------------
+//Global variables
+double baudRate = 115200;           //Communication//
+
+float Torque = 1.00;        //-------------------------------------
+float TorqueMap = 1.00;             //Controll values//
+float Angle = 1.00;         //-------------------------------------
+
+/*int AngFbInt;               //-------------------------------------
+char AngFeedbackChar[15];             //FEEDBACK//
+String VeloFeedback;
+String RpmFeedback;
+String DistFeedback;
+String Time_log;
+int send_number = 32;
+int filling = 0;
+char buf_t[10];
+char buf1[10];
+char buf2[10];
+char buf3[10];
+char Feedback[70];*/          //-------------------------------------
+
+//const int interrupt0 = 0; // (PIN 2)  //ENCODER READING//
+
+//long sum_pulse_num = 0;
+//int pulse_num;                    //Calculations//
+//int rpm = 0;
+//float spd_1 = 0, spd_2 = 0; //-------------------------------------
+
+void drive(float Tq);         //-------------------------------------
+void steer(float deg);
+void BW(float PWM);
+void FW(float PWM);             // List Of Functions //
+//void Enc_Calc();
+//void Pulse_counter();
+int ServFb();                 //-------------------------------------
+
+//----------------------------------------------------------------------
+//Motor and Servo initialization Input-Output settings
+void setup() {
+  Serial.begin(baudRate);
+  //pinMode (SrvFb, INPUT);
+  pinMode (SrvDrv, OUTPUT);
+  pinMode (ENA, OUTPUT);
+  pinMode (IN1, OUTPUT);
+  pinMode (IN2, OUTPUT);
+  //pinMode (ENC_A, INPUT_PULLUP);
+  //pinMode (ENC_B, INPUT_PULLUP);
+  myservo.attach(SrvDrv);
+  
+  //attachInterrupt(interrupt0, Pulse_counter, FALLING);
+}
+
+//----------------------------------------------------------------------
+                  // // // START OF LOOP // // //
+void loop() {
+   if (Serial.available())  
+   {
+    // Get next command from SerialPort
+      char input[INPUT_SIZE + 1];
+      byte size = Serial.readBytes(input, INPUT_SIZE);
+      // Add a '0' to end the string
+      input[size] = 0;
+
+      // Read each command pair 
+      char* Cont_msg = strtok(input, "a");
+      while (Cont_msg != 0)
+      {
+        // Split the command in two values
+        char* separator = strchr(Cont_msg, ',');
+        if (separator != 0)
+        {
+            // Actually split the string into two parts
+            *separator = 0;
+            Torque = atof(Cont_msg);
+            ++separator;
+            Angle = atof(separator);
+        }
+      // Find the next command in input string
+      Cont_msg = strtok(0, "a");
+      }
+  }
+//----------------------------------------------------------------------
+  drive(Torque);
+  steer(Angle);       // Update Functions    
+  //Enc_Calc();
+  delay(19);
+  //Serial.println(millis());
+  // NOW : 50 HZ
+  
+//----------------------------------------------------------------------
+  /*AngFbInt = ServFb();
+  itoa(AngFbInt, AngFeedbackChar, 10);
+  Time_log = String(millis());
+  Time_log.toCharArray(buf_t, 10);
+  strcpy(Feedback, buf_t);
+  strcat(Feedback, " ");
+  strcat(Feedback, AngFeedbackChar);
+  strcat(Feedback, " ");
+  strcat(Feedback, buf1);                   //FEEDBACK//
+  strcat(Feedback, " ");                    // NOT USED NOW //
+  strcat(Feedback, buf2);
+  strcat(Feedback, " ");
+  strcat(Feedback, buf3);
+  String str(Feedback);
+  //Serial.println(str.length());
+  filling = send_number - (str.length()) - 1;
+  strcat(Feedback, " ");
+  for (int i=0; i < filling; i++)
+  {
+      strcat(Feedback, "k");
+      delay(1);
+  }
+  //Serial.println(filling);
+  Serial.println(Feedback);
+  //Serial.println(millis());
+  // Avarage 81 Hz
+  delay(35);
+  // Now : 20 HZ*/
+}
+          // // // // END OF LOOP // // // //
+//----------------------------------------------------------------------
+          // // // START OF FUNCTIONS // // //
+          
+//Drive control - Forward or Backward - and mapping
+void drive(float Tq){
+  float TorqueMap;
+  if (Tq < 1){
+    TorqueMap = abs((Tq * 255) - 255);
+    BW(TorqueMap);
+  }
+  else if (Tq >= 1){
+    TorqueMap = ((Tq-1) * 255);
+    FW(TorqueMap);
+  }
+  else{
+    FW(1);
+  }
+}
+
+//Servo control and mapping
+void steer(float deg){
+  float AngleMap = 90;
+    AngleMap = round(((deg)*70)+20);
+    myservo.write(AngleMap);
+  //Serial.println(AngleMap);
+}
+
+//Motor Control Backward
+void BW(float PWM){
+  analogWrite(ENA, PWM);
+  //Serial.println(PWM);
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  //Serial.print(PWM);
+  //Serial.print(' ');
+}
+
+//Motor Control Forward
+void FW(float PWM){
+  analogWrite(ENA, PWM);
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+}
+
+//----------------------------------------------------------------------
+/*
+void Enc_Calc(){
+  Motor_FB FB_1;                // 48 Encoder pulse = 1 round
+  rpm = pulse_num * 97 / 10;    // RPM calculating ratio : 97 / min
+  //Serial.print(rpm);
+  //Serial.print("\t");
+  FB_1.rpm = rpm;
+  FB_1.velo = (rpm * 0.56548) / 60 / 10;
+  //Serial.print("Speed = ");
+  //Serial.print(FB_1.velo, 4);
+  //Serial.print(" m/s");
+  //Serial.print("\t"); 
+  sum_pulse_num = sum_pulse_num + pulse_num;
+  FB_1.dist = sum_pulse_num / 47.5 / 47.5 * 0.56548;
+  //Serial.print("Distance: ");
+  //Serial.print(FB_1.dist, 4);
+  //Serial.println(" m");                           // NOT USED NOW //
+  //Serial.print("\t");
+  VeloFeedback = String(FB_1.velo);
+  RpmFeedback = String(FB_1.rpm);
+  DistFeedback = String(FB_1.dist);
+  VeloFeedback.toCharArray(buf1, 10);
+  RpmFeedback.toCharArray(buf2, 10);
+  DistFeedback.toCharArray(buf3, 10);
+  pulse_num = 0x00;
+}
+
+//----------------------------------------------------------------------
+
+void Pulse_counter()
+{
+ if(digitalRead(ENC_B) == HIGH) pulse_num++;          // NOT USED NOW //
+ else pulse_num--;
+}*/
+
+//----------------------------------------------------------------------
+
+int ServFb(){
+  int val = analogRead(SrvFb);              //Analog value reading to know the position
+  //Serial.print(val);
+  int valMap = map(val, 120, 372, -10, 10); //Remap the analog interval to get the angle of the car 
+  return valMap;
+}
