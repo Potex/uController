@@ -1,7 +1,7 @@
 /*
 ******************************************************************************************
-Deep-Pilot Projet 2018.10.10
-Krecht Rudolf - Gulyás Péter
+Deep-Pilot Projet 2018.10.17
+Gulyás Péter
 Autonomous model car : Motordriver control and Encoder reading on serial port
 Serial string to read : command_torque , command_steering
 //Feedback : Time Steer_angle Velocity Rpm Distance_behind
