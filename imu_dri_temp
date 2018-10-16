@@ -1,0 +1,269 @@
+//Deep-pilot project SZE
+//Gulyás Péter
+//BNO055 ASSN 40Hz - 10 data read
+
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+#include <EEPROM.h>
+
+/* This driver reads Orientation-Linacc-Gyro data from the BNO055
+   Connections
+   ===========
+   Connect SCL to analog 5
+   Connect SDA to analog 4
+   Connect VDD to 5V DC
+   Connect GROUND to GND
+   D2 - Encoder A
+   D8 - Encoder B
+*/
+
+/* Set the delay between fresh samples */
+#define BNO055_SAMPLERATE_DELAY_MS (13)
+
+//Define BNO-ID
+Adafruit_BNO055 bno = Adafruit_BNO055(29);
+
+//Functio to display Sensor offset values:
+void displaySensorOffsets(const adafruit_bno055_offsets_t &calibData)
+    {
+        Serial.print("Accelerometer: ");
+        Serial.print(calibData.accel_offset_x); Serial.print(" ");
+        Serial.print(calibData.accel_offset_y); Serial.print(" ");
+        Serial.print(calibData.accel_offset_z); Serial.print(" ");
+
+        Serial.print("\nGyro: ");
+        Serial.print(calibData.gyro_offset_x); Serial.print(" ");
+        Serial.print(calibData.gyro_offset_y); Serial.print(" ");
+        Serial.print(calibData.gyro_offset_z); Serial.print(" ");
+
+        Serial.print("\nMag: ");
+        Serial.print(calibData.mag_offset_x); Serial.print(" ");
+        Serial.print(calibData.mag_offset_y); Serial.print(" ");
+        Serial.print(calibData.mag_offset_z); Serial.print(" ");
+
+        Serial.print("\nAccel Radius: ");
+        Serial.print(calibData.accel_radius);
+
+        Serial.print("\nMag Radius: ");
+        Serial.print(calibData.mag_radius);
+    }
+    
+#define SrvFb A0  
+#define ENC_A 2
+#define ENC_B 8
+
+//Define variables
+float QX = 0, QY = 0, QZ = 0, QW = 0;
+float GX = 0, GY = 0, GZ = 0;
+float LX = 0, LY = 0, LZ = 0;
+String mystring;
+
+struct MotFb
+{
+  double velo;
+  double dist;
+  int rpm;
+};
+typedef struct MotFb Motor_FB;
+
+int AngFbInt;               //-------------------------------------                    
+String VeloFeedback;                    //FEEDBACK//
+String RpmFeedback;
+String DistFeedback;
+//String str;
+String buf1;
+String buf2;
+String buf3;            //-------------------------------------
+
+const int interrupt0 = 0; // (PIN 2)  //ENCODER READING//
+
+long sum_pulse_num = 0;
+int pulse_num;                    //Calculations//
+int rpm = 0;
+
+void Enc_Calc();
+void Pulse_counter();
+int ServFb();                 //-------------------------------------
+
+//Initialization - Check if BNO is detected --> EEPROM reading for calibration offset values --> Set Crystal use
+void setup(void)
+    {
+        pinMode (SrvFb, INPUT);
+        pinMode (ENC_A, INPUT_PULLUP);
+        pinMode (ENC_B, INPUT_PULLUP);
+        attachInterrupt(interrupt0, Pulse_counter, FALLING);
+        
+        Serial.begin(115200);
+        delay(500);
+        //Serial.println("Orientation Sensor Test"); Serial.println("");
+        /* Initialise the sensor */
+        if (!bno.begin())
+        {
+            /* There was a problem detecting the BNO055 ... check your connections */
+            //Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+            while (1);
+        }
+
+        int eeAddress = 0;
+        long bnoID;
+        bool foundCalib = false;
+
+        EEPROM.get(eeAddress, bnoID);
+
+        adafruit_bno055_offsets_t calibrationData;
+        sensor_t sensor;
+
+        bno.getSensor(&sensor);
+        if (bnoID != sensor.sensor_id)
+        {
+            Serial.println("\nNo Calibration Data for this sensor exists in EEPROM");
+            delay(500);
+        }
+        else
+        {
+            //Serial.println("\nFound Calibration for this sensor in EEPROM.");
+            eeAddress += sizeof(long);
+            EEPROM.get(eeAddress, calibrationData);
+
+            //displaySensorOffsets(calibrationData);
+
+            //Serial.println("\n\nRestoring Calibration data to the BNO055...");
+            bno.setSensorOffsets(calibrationData);
+
+            //Serial.println("\n\nCalibration data loaded into BNO055");
+            delay(2000);
+            bno.setExtCrystalUse(false);
+            delay(100);
+        }
+    }
+//Reading sensor and encoder-servo values
+void loop(void)
+{
+/* Get a new sensor event */
+sensors_event_t event;
+bno.getEvent(&event);
+
+/* Display timestamp*/
+  //Serial.print(millis());
+  //Serial.print(",");
+/* Display Heading-Roll-Pitch sensor data 
+Serial.print(event.orientation.x, 2);
+Serial.print(",");
+Serial.print(event.orientation.y, 2);
+Serial.print(",");
+Serial.print(event.orientation.z, 2); */
+
+/* Display Quaternion data */
+imu::Quaternion quat = bno.getQuat();
+  QX = (quat.x());
+  QY = (quat.y());
+  QZ = (quat.z());
+  QW = (quat.w());
+  mystring = String(QX, 6);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(QY, 6);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(QZ, 6);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(QW, 6);
+  Serial.print(mystring);
+  Serial.print(" ");
+  
+/* Display the Gyroscope data */
+imu::Vector<3> eulergyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+  GX = eulergyro.x();
+  GY = eulergyro.y();
+  GZ = eulergyro.z();
+  mystring = String(GX, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(GY, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(GZ, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+  
+/* Display the Linearaccelerometer data */
+imu::Vector<3> eulerlin = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL); 
+  LX = eulerlin.x();
+  LY = eulerlin.y();
+  LZ = eulerlin.z();
+  mystring = String(LX, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(LY, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+  mystring = String(LZ, 3);
+  Serial.print(mystring);
+  Serial.print(" ");
+
+/* Display the Encoder and servo data */
+  Enc_Calc();
+  AngFbInt = ServFb();
+  Serial.print(AngFbInt);
+  Serial.print(" ");
+  Serial.print(buf1);
+  Serial.print(" ");
+  Serial.print(buf2);
+  Serial.print(" ");
+  Serial.print(buf3);
+  
+  
+/* New line for the next sample */
+Serial.println("");
+
+/* Wait the specified delay before requesting nex data */
+delay(BNO055_SAMPLERATE_DELAY_MS);
+}
+
+//----------------------------------------------------------------------
+
+void Enc_Calc(){
+  Motor_FB FB_1;                // 48 Encoder pulse = 1 round
+  rpm = pulse_num * 97 / 10;    // RPM calculating ratio : 97 / min
+  //Serial.print(rpm);
+  //Serial.print("\t");
+  FB_1.rpm = rpm;
+  FB_1.velo = (rpm * 0.56548) / 60 / 10;
+  //Serial.print("Speed = ");
+  //Serial.print(FB_1.velo, 4);
+  //Serial.print(" m/s");
+  //Serial.print("\t"); 
+  sum_pulse_num = sum_pulse_num + pulse_num;
+  FB_1.dist = sum_pulse_num / 47.5 / 47.5 * 0.56548;
+  //Serial.print("Distance: ");
+  //Serial.print(FB_1.dist, 4);
+  //Serial.println(" m");                           
+  //Serial.print("\t");
+  VeloFeedback = String(FB_1.velo);
+  RpmFeedback = String(FB_1.rpm);
+  DistFeedback = String(FB_1.dist);
+  buf1 = VeloFeedback;
+  buf2 = RpmFeedback;
+  buf3 = DistFeedback;
+  pulse_num = 0x00;
+}
+
+//----------------------------------------------------------------------
+
+void Pulse_counter()
+{
+ if(digitalRead(ENC_B) == HIGH) pulse_num++;          
+ else pulse_num--;
+}
+
+//----------------------------------------------------------------------
+
+int ServFb(){
+  int val = analogRead(SrvFb);              //Analog value reading to know the position
+  //Serial.print(val);
+  int valMap = map(val, 132, 413, -10, 10); //Remap the analog interval to get the angle of the car 
+  return valMap;
+}
