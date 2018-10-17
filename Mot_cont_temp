@@ -1,14 +1,14 @@
 /*
 ******************************************************************************************
 Deep-Pilot Projet 2018.10.10
-Krecht Rudolf - Gulyás Péter
+Gulyás Péter
 Autonomous model car : Motordriver control and Encoder reading on serial port
 Serial string to read : command_torque , command_steering
 //Feedback : Time Steer_angle Velocity Rpm Distance_behind
 Torque set: {0;2}
 Steering controll set: {0;2}
 Steer_angle_feedback (-10° ; 10°)
-Velocity in m/s
+Velocity in rad/s
 PIN MAP Arduino Uno:
 A0 - Servo feedback
 D9 - Servo control
@@ -211,27 +211,27 @@ void FW(float PWM){
 /*
 void Enc_Calc(){
   Motor_FB FB_1;                // 48 Encoder pulse = 1 round
-  rpm = pulse_num * 97 / 10;    // RPM calculating ratio : 97 / min
+  rpm = pulse_num * 60 / 48;    // RPM calculating ratio : min/ppr
   //Serial.print(rpm);
   //Serial.print("\t");
   FB_1.rpm = rpm;
-  FB_1.velo = (rpm * 0.56548) / 60 / 10;
+  FB_1.velo = rpm / 9.5492965964254;
   //Serial.print("Speed = ");
   //Serial.print(FB_1.velo, 4);
-  //Serial.print(" m/s");
+  //Serial.print(" rad/s");
   //Serial.print("\t"); 
   sum_pulse_num = sum_pulse_num + pulse_num;
   FB_1.dist = sum_pulse_num / 47.5 / 47.5 * 0.56548;
   //Serial.print("Distance: ");
   //Serial.print(FB_1.dist, 4);
-  //Serial.println(" m");                           // NOT USED NOW //
+  //Serial.println(" m");                           
   //Serial.print("\t");
   VeloFeedback = String(FB_1.velo);
   RpmFeedback = String(FB_1.rpm);
   DistFeedback = String(FB_1.dist);
-  VeloFeedback.toCharArray(buf1, 10);
-  RpmFeedback.toCharArray(buf2, 10);
-  DistFeedback.toCharArray(buf3, 10);
+  buf1 = VeloFeedback;
+  buf2 = RpmFeedback;
+  buf3 = DistFeedback;
   pulse_num = 0x00;
 }
 
