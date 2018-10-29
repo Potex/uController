@@ -227,7 +227,7 @@ delay(BNO055_SAMPLERATE_DELAY_MS);
 
 void Enc_Calc(){
   Motor_FB FB_1;                // 48 Encoder pulse = 1 round
-  rpm = pulse_num * 60 / 48;    // RPM calculating ratio : min/ppr
+  rpm = pulse_num * 60 / 24;    // RPM calculating ratio for 1 ch
   //Serial.print(rpm);
   //Serial.print("\t");
   FB_1.rpm = rpm;
@@ -237,7 +237,7 @@ void Enc_Calc(){
   //Serial.print(" rad/s");
   //Serial.print("\t"); 
   sum_pulse_num = sum_pulse_num + pulse_num;
-  FB_1.dist = sum_pulse_num / 47.5 / 47.5 * 0.56548;
+  FB_1.dist = sum_pulse_num / 1185.36 * 0.282743;
   //Serial.print("Distance: ");
   //Serial.print(FB_1.dist, 4);
   //Serial.println(" m");                           
